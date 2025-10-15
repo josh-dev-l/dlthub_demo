@@ -1,0 +1,26 @@
+# put your configuration values here
+
+[runtime]
+log_level="WARNING"  # the system log level of dlt
+# use the dlthub_telemetry setting to enable/disable anonymous usage data reporting, see https://dlthub.com/docs/reference/telemetry
+dlthub_telemetry = true
+
+[tpch_data_pipeline.sources.filesystem]
+bucket_url = "s3://clickhouse-datasets"
+
+[tpch_athena_pipeline.sources.filesystem]
+bucket_url = "s3://clickhouse-datasets"
+
+[tpch_athena_pipeline.destination.filesystem]
+bucket_url = "s3://cat-rnd-odp-dev-lake-bucket/tables"
+
+[tpch_athena_pipeline.destination.athena]
+athena_work_group="cat-rnd-odp-dev-lake-workgroup"
+query_result_bucket="s3://cat-rnd-odp-dev-lake-bucket/athena_results"
+force_iceberg=true
+table_location_layout="{dataset_name}/{table_name}"
+aws_data_catalog="awsdatacatalog"
+info_tables_query_threshold=90
+
+[tpch_athena_pipeline.destination.athena.conn_properties]
+poll_interval=2
