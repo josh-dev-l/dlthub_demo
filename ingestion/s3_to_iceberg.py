@@ -16,8 +16,8 @@ tpch_customer_source_s3 = filesystem(
 )
 
 region  = (tpch_region_source_s3 | read_csv(delimiter="|", header=None, names=["r_regionkey", "r_name", "r_comment"]))
-nation = (tpch_nation_source_s3 | read_csv(delimiter="|", header=None, names=["n_nationkey", "n_name", "n_regionkey", "n_comment"], compression="gzip"))
-customer = (tpch_customer_source_s3 | read_csv(delimiter="|", header=None, names=["c_custkey", "c_name", "c_address", "c_nationkey", "c_phone", "c_acctbal", "c_mktsegment", "c_comment"], compression="gzip"))
+nation = (tpch_nation_source_s3 | read_csv(delimiter="|", header=None, names=["n_nationkey", "n_name", "n_regionkey", "n_comment"]))
+customer = (tpch_customer_source_s3 | read_csv(delimiter="|", header=None, names=["c_custkey", "c_name", "c_address", "c_nationkey", "c_phone", "c_acctbal", "c_mktsegment", "c_comment"]))
 
 pipeline = dlt.pipeline(
     pipeline_name="tpch_athena_pipeline", 
