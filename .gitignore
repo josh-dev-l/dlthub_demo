@@ -9,3 +9,4 @@
 # ignore duckdb
 *.duckdb
 *.wal
+*.log

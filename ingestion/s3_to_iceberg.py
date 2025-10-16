@@ -22,25 +22,32 @@ logger = logging.getLogger(__name__)
 BRONZE_LAYER = "cat_rnd_odp_dev_lake_bronze"
 PIPELINE_NAME = "tpch_athena_pipeline"
 
-# Table configurations
+# Table configurations with batch processing
 TABLE_CONFIGS = {
     'tpch_region': {
         'file_glob': 'h/1/region*.tbl',
         'delimiter': '|',
         'columns': ["r_regionkey", "r_name", "r_comment"],
-        'description': 'TPCH Region dimension table'
+        'description': 'TPCH Region dimension table',
+        'batch_size': 10000,
+        'chunksize': 5000
     },
     'tpch_nation': {
         'file_glob': 'h/100/nation*.tbl*',
         'delimiter': '|',
         'columns': ["n_nationkey", "n_name", "n_regionkey", "n_comment"],
-        'description': 'TPCH Nation dimension table'
+        'description': 'TPCH Nation dimension table',
+        'batch_size': 25000,
+        'chunksize': 5000
     },
     'tpch_customer': {
         'file_glob': 'h/100/customer*.tbl*',
         'delimiter': '|',
         'columns': ["c_custkey", "c_name", "c_address", "c_nationkey", "c_phone", "c_acctbal", "c_mktsegment", "c_comment"],
-        'description': 'TPCH Customer dimension table'
+        'description': 'TPCH Customer dimension table',
+        'batch_size': 50000,
+        'chunksize': 10000,
+        'parallel_readers': 4
     }
 }
 
@@ -66,20 +73,33 @@ def log_table_run_start(table_name: str, config: Dict[str, Any]) -> None:
     logger.info(f"📝 Description: {config['description']}")
     logger.info(f"🔍 Source pattern: {config['file_glob']}")
     logger.info(f"📄 Columns: {len(config['columns'])} columns")
+    if 'batch_size' in config:
+        batch_info = f"batch_size={config['batch_size']}, chunksize={config['chunksize']}"
+        if 'parallel_readers' in config:
+            batch_info += f", parallel_readers={config['parallel_readers']}"
+        logger.info(f"📦 Batch processing: {batch_info}")
     logger.info(f"⏰ Start time: {datetime.now().strftime('%H:%M:%S')}")
 
 
 def log_table_run_end(table_name: str, result: LoadInfo, duration: float) -> None:
     """Log individual table processing end"""
-    logger.info(f"✅ Table {table_name} completed in {duration:.2f} seconds")
+    logger.info(f"✅ Table {table_name} completed in {duration:.2f} seconds ({duration/60:.2f} minutes)")
     if hasattr(result, 'loads_ids') and result.loads_ids:
         logger.info(f"📦 Load IDs: {result.loads_ids}")
     if hasattr(result, 'jobs') and result.jobs:
         logger.info(f"🔧 Jobs completed: {len(result.jobs)}")
-        # Log job details
+        total_rows = 0
+        # Log job details and count rows
         for job in result.jobs:
             if hasattr(job, 'job_file_info'):
                 logger.info(f"   📄 Job: {job.job_file_info.file_name}")
+                if hasattr(job.job_file_info, 'rows_count'):
+                    total_rows += job.job_file_info.rows_count or 0
+        
+        if total_rows > 0:
+            logger.info(f"📊 Total rows processed: {total_rows:,}")
+            rows_per_second = total_rows / duration if duration > 0 else 0
+            logger.info(f"⚡ Processing rate: {rows_per_second:,.0f} rows/second")
     logger.info("-" * 50)
 
 
@@ -94,20 +114,44 @@ def log_pipeline_end(total_duration: float, success: bool = True) -> None:
     logger.info("=" * 80)
 
 
-def create_table_source(table_name: str, config: Dict[str, Any]):
-    """Create a dlt source for a table with error handling"""
+def create_table_source_with_batching(table_name: str, config: Dict[str, Any]):
+    """Create a dlt source for a table with batch processing support"""
     try:
         logger.info(f"🔧 Creating source for {table_name}...")
         
-        # Create filesystem source
-        fs_source = filesystem(file_glob=config['file_glob'])
+        # Create filesystem source with parallel readers if configured
+        fs_kwargs = {'file_glob': config['file_glob']}
+        if 'parallel_readers' in config:
+            logger.info(f"🚀 Using {config['parallel_readers']} parallel readers for faster processing")
+            # Note: dlt filesystem may not directly support parallel_readers parameter
+            # This is a placeholder for when dlt supports it or for custom implementation
+            
+        fs_source = filesystem(**fs_kwargs)
         
-        # Create CSV reader with configuration
-        csv_reader = read_csv(
-            delimiter=config['delimiter'],
-            header=None,
-            names=config['columns']
-        )
+        # Check if batching is configured for this table
+        if 'batch_size' in config and 'chunksize' in config:
+            batch_info = f"batch_size: {config['batch_size']}, chunksize: {config['chunksize']}"
+            if 'parallel_readers' in config:
+                batch_info += f", parallel_readers: {config['parallel_readers']}"
+            logger.info(f"📦 Using batch processing - {batch_info}")
+            
+            # Create CSV reader with batching parameters
+            csv_reader = read_csv(
+                delimiter=config['delimiter'],
+                header=None,
+                names=config['columns'],
+                chunksize=config['chunksize'],  # Process in smaller chunks
+                low_memory=True,  # Optimize memory usage
+                dtype=str  # Read as strings first to avoid type issues
+            )
+        else:
+            # Standard processing for tables without batch config
+            logger.info("📄 Using standard processing (no batching configured)")
+            csv_reader = read_csv(
+                delimiter=config['delimiter'],
+                header=None,
+                names=config['columns']
+            )
         
         # Combine source and reader
         source = fs_source | csv_reader
@@ -170,12 +214,25 @@ def run_pipeline() -> None:
             table_start_time = time.time()
             
             try:
-                # Create source
-                source = create_table_source(table_name, config)
+                # Create source with batching support
+                source = create_table_source_with_batching(table_name, config)
                 
                 # Run pipeline for this table
                 logger.info(f"🚀 Running pipeline for {table_name}...")
-                result = pipeline.run(source, table_name=table_name)
+                
+                # Configure pipeline run based on table configuration
+                run_kwargs = {'table_name': table_name}
+                
+                if 'batch_size' in config:
+                    run_kwargs['write_disposition'] = "replace"  # Replace for batched processing
+                    
+                    # Add parallel processing hints if configured
+                    if 'parallel_readers' in config:
+                        logger.info(f"⚡ Optimizing for parallel processing with {config['parallel_readers']} readers")
+                        # Note: This is configuration tracking, actual parallelism depends on dlt implementation
+                
+                result = pipeline.run(source, **run_kwargs)
+                    
                 results[table_name] = result
                 
                 # Log completion

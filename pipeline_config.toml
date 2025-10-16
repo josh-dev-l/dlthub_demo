@@ -18,18 +18,25 @@ file_glob = "h/1/region*.tbl"
 delimiter = "|"
 columns = ["r_regionkey", "r_name", "r_comment"]
 description = "TPCH Region dimension table"
+batch_size = 10000
+chunksize = 5000
 
 [tables.tpch_nation]
 file_glob = "h/100/nation*.tbl*"
 delimiter = "|"
 columns = ["n_nationkey", "n_name", "n_regionkey", "n_comment"]
 description = "TPCH Nation dimension table"
+batch_size = 25000
+chunksize = 5000
 
 [tables.tpch_customer]
 file_glob = "h/100/customer*.tbl*"
 delimiter = "|"
 columns = ["c_custkey", "c_name", "c_address", "c_nationkey", "c_phone", "c_acctbal", "c_mktsegment", "c_comment"]
 description = "TPCH Customer dimension table"
+batch_size = 50000
+chunksize = 10000
+parallel_readers = 4
 
 [retry]
 max_attempts = 3
