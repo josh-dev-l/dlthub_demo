@@ -31,7 +31,7 @@ def tpch_nation() -> TDataItems:
 @dlt.resource(name="tpch_customer_test", parallelized=False)
 def tpch_customer() -> TDataItems:
     tpch_customer_source_s3 = filesystem(
-        file_glob="h/1/customer*.tbl*"
+        file_glob="h/100/customer*.tbl*"
     )
     customer  = tpch_customer_source_s3 | read_csv(delimiter="|", header=None, names=["c_custkey", "c_name", "c_address", "c_nationkey", "c_phone", "c_acctbal", "c_mktsegment", "c_comment"])
     yield from customer
@@ -52,10 +52,7 @@ pipeline = dlt.pipeline(
 
 # nation = pipeline.run(nation, table_name='tpch_nation', write_disposition="replace")
 # customer = pipeline.run(customer, table_name='tpch_customer', write_disposition="replace")
-load_info = pipeline.run(all_data())
+load_info = pipeline.run(all_data(),write_disposition="replace")
 # pipeline.dataset().df_data.df()
 
-# # print(nation)
-
-# # print(customer)
 print(load_info)

@@ -7,13 +7,12 @@ dlthub_telemetry = true
 
 # extract and normalize stages
 [data_writer]
-buffer_max_items=10000
+buffer_max_items=100000
 file_max_items=100000
-file_max_bytes=1000000
+# file_max_bytes=1000000
 
 [extract]
 workers=3
-max_parallel_items=10
 
 [normalize]
 # use 3 worker processes to process 3 files in parallel
