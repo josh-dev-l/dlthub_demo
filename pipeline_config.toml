@@ -1,0 +1,42 @@
+# TPCH Athena Pipeline Configuration
+# This file contains all configurable settings for the pipeline
+
+[pipeline]
+name = "tpch_athena_pipeline"
+dataset_name = "cat_rnd_odp_dev_lake_bronze"
+destination = "athena"
+staging = "filesystem"
+
+[logging]
+level = "INFO"
+log_to_file = true
+log_filename = "pipeline_logs.log"
+log_format = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+
+[tables.tpch_region]
+file_glob = "h/1/region*.tbl"
+delimiter = "|"
+columns = ["r_regionkey", "r_name", "r_comment"]
+description = "TPCH Region dimension table"
+
+[tables.tpch_nation]
+file_glob = "h/100/nation*.tbl*"
+delimiter = "|"
+columns = ["n_nationkey", "n_name", "n_regionkey", "n_comment"]
+description = "TPCH Nation dimension table"
+
+[tables.tpch_customer]
+file_glob = "h/100/customer*.tbl*"
+delimiter = "|"
+columns = ["c_custkey", "c_name", "c_address", "c_nationkey", "c_phone", "c_acctbal", "c_mktsegment", "c_comment"]
+description = "TPCH Customer dimension table"
+
+[retry]
+max_attempts = 3
+retry_delay = 5
+exponential_backoff = true
+
+[validation]
+check_row_count = true
+min_rows_threshold = 0
+validate_columns = true
