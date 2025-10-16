@@ -8,6 +8,7 @@ dependencies = [
     "dlt[athena,duckdb,filesystem,gs,pyiceberg]>=1.17.1",
     "duckdb>=1.4.1",
     "marimo>=0.16.5",
+    "matplotlib>=3.10.7",
     "pandas>=2.3.3",
     "sqlalchemy>=2.0.18",
 ]
